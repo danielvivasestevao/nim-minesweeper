@@ -4,7 +4,7 @@ from main import Difficulty, Position, Square, Field
 # Difficulties constants
 from main import easy, advanced, pro
 # procs
-from main import parse_difficulty, create_square, create_field, to_char, print_field, get_surrounding_positions, initialize_field
+from main import parse_difficulty, create_square, create_field, to_char, print_field, get_surrounding_positions, initialize_field, find_connected_zero_squares, get_connected_positions, uncover
 
 suite "parse_difficulty test":
 
@@ -162,6 +162,119 @@ suite "test to_char(uint8)":
       discard to_char(10'u8)
 
 
+suite "test get_connected_positions(Position, Field)":
+
+  setup:
+    const easy_field = create_field(easy) # 9 * 9
+
+  test "normal case":
+    let pos: Position = (4'u8, 4'u8)
+    let connected_positions: seq[Position] =
+      get_connected_positions(pos, easy_field)
+    require(connected_positions.len == 4)
+    require((3'u8, 4'u8) in connected_positions)
+    require((5'u8, 4'u8) in connected_positions)
+    require((4'u8, 3'u8) in connected_positions)
+    require((4'u8, 5'u8) in connected_positions)
+
+  test "edge case 1":
+    let pos: Position = (0'u8, 0'u8)
+    let connected_positions: seq[Position] =
+      get_connected_positions(pos, easy_field)
+    require(connected_positions.len == 2)
+    require((0'u8, 1'u8) in connected_positions)
+    require((1'u8, 0'u8) in connected_positions)
+
+  test "edge case 2":
+    let pos: Position = (8'u8, 8'u8)
+    let connected_positions: seq[Position] =
+      get_connected_positions(pos, easy_field)
+    require(connected_positions.len == 2)
+    require((7'u8, 8'u8) in connected_positions)
+    require((8'u8, 7'u8) in connected_positions)
+
+  test "edge case 3":
+    let pos: Position = (5'u8, 8'u8)
+    let connected_positions: seq[Position] =
+      get_connected_positions(pos, easy_field)
+    require(connected_positions.len == 3)
+    require((4'u8, 8'u8) in connected_positions)
+    require((6'u8, 8'u8) in connected_positions)
+    require((5'u8, 7'u8) in connected_positions)
+
+
+suite "test find_connected_zero_squares(Field, Position, seq[Position])":
+
+  setup:
+    var non_trivial_field = create_field(easy)
+    const zero_square_positions = @[
+      (0'u8, 0'u8), (0'u8, 1'u8),
+      (1'u8, 2'u8), (1'u8, 3'u8), (1'u8, 4'u8),
+      (2'u8, 3'u8),
+      (3'u8, 3'u8), (3'u8, 4'u8), (3'u8, 5'u8),
+      (7'u8, 7'u8), (7'u8, 8'u8),
+      (8'u8, 7'u8), (8'u8, 8'u8)
+      ]
+    for x in 0..<non_trivial_field.len:
+      for y in 0..<non_trivial_field[0].len:
+        non_trivial_field[x][y].hidden = false
+        if not ((uint8(x), uint8(y)) in zero_square_positions):
+          non_trivial_field[x][y].value = 1
+
+
+  test "empty field":
+    const easy_field = create_field(easy) # 9 * 9
+    var s: seq[Position] = @[]
+    let connected_zero_squares =
+      find_connected_zero_squares(easy_field, (0'u8, 0'u8), s)
+    require(connected_zero_squares.len == 81)
+    
+
+  ## 0 0 1 1 1 1 1 1 1
+  ## 1 1 0 0 0 1 1 1 1
+  ## 1 1 1 0 1 1 1 1 1
+  ## 1 1 1 0 0 0 1 1 1
+  ## 1 1 1 1 1 1 1 1 1
+  ## 1 1 1 1 1 1 1 1 1
+  ## 1 1 1 1 1 1 1 1 1
+  ## 1 1 1 1 1 1 1 0 0
+  ## 1 1 1 1 1 1 1 0 0
+  test "non trivial field":
+    var connected_zero_squares =
+      find_connected_zero_squares(non_trivial_field,(2'u8, 3'u8))
+    require(connected_zero_squares.len == 7)
+    connected_zero_squares =
+      find_connected_zero_squares(non_trivial_field,(8'u8, 8'u8))
+    require(connected_zero_squares.len == 4)
+    connected_zero_squares =
+      find_connected_zero_squares(non_trivial_field,(0'u8, 1'u8))
+    require(connected_zero_squares.len == 2)
+    
+
+suite "test uncover":
+
+  setup:
+    var non_trivial_field = create_field(easy)
+    const zero_square_positions = @[
+      (0'u8, 0'u8), (0'u8, 1'u8),
+      (1'u8, 2'u8), (1'u8, 3'u8), (1'u8, 4'u8),
+      (2'u8, 3'u8),
+      (3'u8, 3'u8), (3'u8, 4'u8), (3'u8, 5'u8),
+      (7'u8, 7'u8), (7'u8, 8'u8),
+      (8'u8, 7'u8), (8'u8, 8'u8)
+      ]
+    for x in 0..<non_trivial_field.len:
+      for y in 0..<non_trivial_field[0].len:
+        if not ((uint8(x), uint8(y)) in zero_square_positions):
+          non_trivial_field[x][y].value = 1
+
+
+  test "uncover":
+    uncover(non_trivial_field, (2'u8, 3'u8))
+    print_field(non_trivial_field)
+
+
+
 suite "test to_char(Square)":
 
   setup:
@@ -195,3 +308,4 @@ suite "print_field":
       for y in 0..<9:
         field[x][y].hidden = false
     print_field(field)
+

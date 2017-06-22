@@ -42,6 +42,7 @@ proc create_field*(difficulty: Difficulty): Field =
       result[int(i)][int(j)] = create_square()
 
 
+## Get all vertical, horizontal and diagonal neighbouring positions of a position.
 proc get_surrounding_positions*(position: Position, field: Field): seq[Position] =
   if field.len <= 0:
     return @[]
@@ -53,6 +54,18 @@ proc get_surrounding_positions*(position: Position, field: Field): seq[Position]
         let y_coord = int(position.vertical) + y
         if (x_coord in 0..<field.len) and (y_coord in 0..<field[0].len):
           result.add((vertical: uint8(y_coord), horizontal: uint8(x_coord)))
+
+
+## Get all vertical and horizontal neighbouring positions of a position.
+proc get_connected_positions*(position: Position, field: Field): seq[Position] =
+  if field.len <= 0:
+    return @[]
+  result = @[]
+  for x in @[-1, 1]:
+    if int(position.vertical) + x >= 0 and int(position.vertical) + x < field.len:
+      result.add((uint8(int(position.vertical) + x), position.horizontal))
+    if int(position.horizontal) + x >= 0 and int(position.horizontal) + x < field[0].len:
+      result.add((position.vertical, (uint8(int(position.horizontal) + x))))
 
 
 ## Set mines randomly and update surrounding fields
@@ -73,8 +86,35 @@ proc initialize_field*(field: var Field, difficulty: Difficulty) {.discardable.}
         field[int(f.vertical)][int(f.horizontal)].value += 1
 
 
-# proc uncover(field: var Field, pos: Position):
+proc find_connected_zero_squares*(field: Field, pos: Position, seen_positions: var seq[Position]): seq[Position] =
+  result = @[]
+  for connected_position in get_connected_positions(pos, field):
+    if not (connected_position in seen_positions):
+      seen_positions.add(connected_position)
+      let square = field[int(connected_position.vertical)][int(connected_position.horizontal)]
+      if square.value == 0:
+        result.add(connected_position)
+        result.add(find_connected_zero_squares(field, connected_position, seen_positions))
 
+
+proc find_connected_zero_squares*(field: Field, pos: Position): seq[Position] =
+  var seen_positions: seq[Position] = @[]
+  return find_connected_zero_squares(field, pos, seen_positions)
+
+
+## Set all squares with value=0 which are connected to the given position to hidden=false.
+## Set all squares surrounding any of the uncovered value=0 squares to hidden=false.
+proc uncover*(field: var Field, pos: Position) {.discardable.} =
+  let zero_square_positions = find_connected_zero_squares(field, pos)
+  var uncovered_positions: seq[Position] = @[]
+  for zero_square_position in zero_square_positions:
+    field[int(zero_square_position.vertical)][int(zero_square_position.horizontal)].hidden = false
+    uncovered_positions.add(zero_square_position)
+    for surrounding_position in get_surrounding_positions(zero_square_position, field):
+      let cur_square_value = field[int(surrounding_position.vertical)][int(surrounding_position.horizontal)].value
+      if not ((cur_square_value == 0) or (surrounding_position in uncovered_positions)):
+        field[int(surrounding_position.vertical)][int(surrounding_position.horizontal)].hidden = false
+        uncovered_positions.add(surrounding_position)
 
 proc to_char*(value: uint8): char =
   let value_str = $(value)
